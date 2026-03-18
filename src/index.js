@@ -1,8 +1,6 @@
 import dotenv from "dotenv";
 import connectDB from "./db/index.js";
-import exprss from "express"
-
-const app = exprss()
+import app from "./app.js"
 dotenv.config({
   path: "./env",
 });
@@ -22,7 +20,6 @@ connectDB()
   .catch("error",(err) => {
     console.log(`MongoDB Connection Failed !!! ${err}`);
   });
-
 
 import {route} from "./routes/users.routes.js"
 app.use("/api/users",route)
