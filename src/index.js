@@ -2,7 +2,7 @@ import dotenv from "dotenv";
 import connectDB from "./db/index.js";
 import app from "./app.js"
 dotenv.config({
-  path: "./env",
+  path: "./.env",
 });
 
 connectDB()
@@ -22,5 +22,5 @@ connectDB()
   });
 
 import {route} from "./routes/users.routes.js"
-app.use("/api/users",route)
+app.use("/api/v1/users",route)
 
