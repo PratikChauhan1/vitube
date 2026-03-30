@@ -439,60 +439,59 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
     .json(new ApiError(200, channel[0], "User Channel fetched Successfully"));
 });
 
-
-const getWatchHistory = asyncHandler(async(req,res)=>{
-
+const getWatchHistory = asyncHandler(async (req, res) => {
   const user = await User.aggregate([
     {
-      $match:{
-         _id: new mongoose.Types.ObjectId(req.user._id)
-      }
+      $match: {
+        _id: new mongoose.Types.ObjectId(req.user._id),
+      },
     },
     {
-      $lookup:{
+      $lookup: {
         from: "videos",
-        localField:"watchHistory",
+        localField: "watchHistory",
         foreignField: "id",
-        as : "WatchHistroy",
-        pipeline:[
+        as: "WatchHistroy",
+        pipeline: [
           {
-            $lookup:{
-              form:"users",
-              localField:"owner",
-              foreignField:"_id",
+            $lookup: {
+              form: "users",
+              localField: "owner",
+              foreignField: "_id",
               as: "owner",
-              pipeline:[
+              pipeline: [
                 {
-                  $project:{
-                    fullname:1,
-                    username:1,
-                    avatar:1
-                  }
-                }
-              ]
-            }
+                  $project: {
+                    fullname: 1,
+                    username: 1,
+                    avatar: 1,
+                  },
+                },
+              ],
+            },
           },
           {
-            $addFields:{
-              owner:{
-                $first:"$owner"
-              }
-            }
-          }
-        ]
-      }
-    }
-  ])
+            $addFields: {
+              owner: {
+                $first: "$owner",
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
   return res
-        .status(200)
-        .json(
-          new ApiError(
-            200,
-            user[0].getWatchHistory,
-            "Watch history fetched Successfully"
-          )
-        )
-})
+    .status(200)
+    .json(
+      new ApiError(
+        200,
+        user[0].getWatchHistory,
+        "Watch history fetched Successfully"
+      )
+    );
+});
+
 export {
   registerUser,
   loginUser,
@@ -505,5 +504,5 @@ export {
   changeCurrentPassword,
   deleteCoverImage,
   getUserChannelProfile,
-  getWatchHistory
+  getWatchHistory,
 };
