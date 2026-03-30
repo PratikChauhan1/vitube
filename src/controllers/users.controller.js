@@ -1,9 +1,9 @@
-import { useReducer } from "react";
+// import react from "react";
 import { User } from "../models/user.models.js";
 import { ApiError } from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
-import { unloadOnCloudinary } from "../utils/clodinary.js";
+import { unloadOnCloudinary ,deleteOnCloudinary} from "../utils/clodinary.js";
 import jwt from "jsonwebtoken";
 
 const generateAccessAndRefereshTokens = async (userId) => {
@@ -25,10 +25,6 @@ const generateAccessAndRefereshTokens = async (userId) => {
 };
 
 const registerUser = asyncHandler(async (req, res) => {
-  console.log("API HIT");
-  console.log("Headers:", req.headers);
-  console.log("Body:", req.body);
-
   const { email, password, fullName, username } = req.body;
 
   if (
@@ -153,7 +149,7 @@ const logoutUser = asyncHandler(async (req, res) => {
       $set: { refreshToken: undefined },
     },
     {
-      new: true,
+      returnDocument: "after",
     }
   );
 
@@ -238,25 +234,27 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {
 const getCurrentUser = asyncHandler(async (req, res) => {
   return res
     .status(200)
-    .json(200, req.user, "current user fetched Successfully");
+    .json(new ApiResponse(200, req.user, "current user fetched Successfully"));
 });
 
 const updateAccountDetails = asyncHandler(async (req, res) => {
-  const { fullName, email } = req.body;
+  const { fullName, email, username } = req.body;
 
-  if (!(fullName || email)) {
-    throw new ApiError(404, "All fields are required");
+  if (!(fullName || email || username)) {
+    throw new ApiError(400, "At least one field is required");
   }
 
-  await User.findByIdAndUpdate(
+  const user = await User.findByIdAndUpdate(
     req.user?._id,
+
     {
       $set: {
-        fullName,
+        fullName: fullName,
         email: email,
+        username: username,
       },
     },
-    { new: true }
+    { returnDocument: "after" }
   ).select("-password");
 
   return res
@@ -265,26 +263,45 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 });
 
 const updateUserAvatar = asyncHandler(async (req, res) => {
+  // Delete after update avatar Image
+
   const avatarLocalPath = req.file?.path;
+  
 
   if (!avatarLocalPath) {
     throw new ApiError(400, "Avatar file required");
   }
 
+// Upload new aAvatar 
   const avatar = await unloadOnCloudinary(avatarLocalPath);
   if (!avatar.url) {
     throw new ApiError(400, "Error while uploading on avatar");
   }
 
-  const user =await User.findByIdAndUpdate(
+
+//  current User 
+ const currentUser = await User.findById(req.user._id)
+
+
+
+//Update DB
+  const user = await User.findByIdAndUpdate(
     req.user?._id,
     {
       $set: {
         avatar: avatar.url,
       },
     },
-    { new: true }
+    { returnDocument:"after" }
   ).select("-password");
+  
+
+//  Delete Old Avatar
+ if (currentUser.avatar) {
+    
+    const CloudinaryID = currentUser.avatar.split("/").pop().split(".")[0];
+    await deleteOnCloudinary(CloudinaryID);
+  }
 
   return res
     .status(200)
@@ -292,11 +309,15 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 });
 
 const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const currentUser = await User.findById(req.user._id)
+  console.log(currentUser);
+  
   const coverImageLocalPath = req.file?.path;
 
   if (!coverImageLocalPath) {
     throw new ApiError(400, "CoverImage file is Missing  ");
   }
+
 
   const coverImage = await unloadOnCloudinary(coverImageLocalPath);
   if (!coverImage.url) {
@@ -310,13 +331,52 @@ const updateUserCoverImage = asyncHandler(async (req, res) => {
         coverImage: coverImage.url,
       },
     },
-    { new: true }
+    { returnDocument:"after"}
   ).select("-password");
+
+  // const currentUser = await User.findById(req.user._id)
+  const CloudinaryID = currentUser.coverImage.split("/").pop().split(".")[0];
+  await deleteOnCloudinary(CloudinaryID)
+
 
   return res
     .status(200)
     .json(new ApiResponse(200, user, "CoverImage Update Successfully "));
 });
+
+const deleteCoverImage = asyncHandler(async (req, res) => {
+
+  const currentUser = await User.findById(req.user._id);
+  console.log(currentUser.coverImage);
+  
+
+  if (!currentUser?.coverImage ) {
+    throw new ApiError(400, "No cover image found");
+  }
+
+  // Extract public_id
+  const publicId = currentUser.coverImage.split("/").pop().split(".")[0];
+  console.log("Public ID:", publicId);
+
+  // Delete from Cloudinary
+  await deleteOnCloudinary(publicId);
+
+  // Remove from DB
+  const user = await User.findByIdAndUpdate(
+    req.user._id,
+    {
+      $unset: {
+        coverImage: ""
+      }
+    },
+    { returnDocument:"after" }
+  ).select("-password");
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, user, "Cover Image Deleted Successfully"));
+});
+
 
 export {
   registerUser,
@@ -326,5 +386,7 @@ export {
   getCurrentUser,
   updateAccountDetails,
   updateUserAvatar,
-  updateUserCoverImage
+  updateUserCoverImage,
+  changeCurrentPassword,
+  deleteCoverImage
 };
